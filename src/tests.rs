@@ -44,18 +44,14 @@ fn default_face_is_invalid() {
 #[test]
 fn initial_mesh_has_default_elements() {
     let mesh = Mesh::new();
-    assert! {
-        mesh.edge_list.len() == 1 &&
-            mesh.edge_list[0].is_valid() == false
-    };
-    assert! {
-        mesh.vertex_list.len() == 1 &&
-            mesh.vertex_list[0].is_valid() == false
-    };
-    assert! {
-        mesh.face_list.len() == 1 &&
-            mesh.face_list[0].is_valid() == false
-    };
+
+    assert_eq!(mesh.edge_list.len(), 1);
+    assert_eq!(mesh.vertex_list.len(), 1);
+    assert_eq!(mesh.face_list.len(), 1);
+
+    assert!(mesh.edge_list[0].is_valid() == false);
+    assert!(mesh.vertex_list[0].is_valid() == false);
+    assert!(mesh.face_list[0].is_valid() == false);
 }
 
 #[test]
@@ -65,7 +61,7 @@ fn can_iterate_over_faces() {
     mesh.face_list.push(Face::new(EdgeIndex(4)));
     mesh.face_list.push(Face::new(EdgeIndex(7)));
 
-    assert!(mesh.face_list.len() == 4);
+    assert_eq!(mesh.face_list.len(), 4);
 
     let mut faces_iterated_over = 0;
 
@@ -75,7 +71,7 @@ fn can_iterate_over_faces() {
         faces_iterated_over += 1;
     }
 
-    assert!(faces_iterated_over == 3);
+    assert_eq!(faces_iterated_over, 3);
 }
 
 #[test]
@@ -86,9 +82,9 @@ fn can_iterate_over_edges_of_face() {
     let v3 = mesh.add_vertex(Vertex::default());
     let _face = mesh.add_triangle(v1, v2, v3);
 
-    assert!(mesh.vertex_list.len() == 4);
-    assert!(mesh.edge_list.len() == 7);
-    assert!(mesh.face_list.len() == 2);
+    assert_eq!(mesh.vertex_list.len(), 4);
+    assert_eq!(mesh.edge_list.len(), 7);
+    assert_eq!(mesh.face_list.len(), 2);
 
     let mut faces_iterated_over = 0;
     let mut edges_iterated_over = 0;
@@ -105,8 +101,8 @@ fn can_iterate_over_edges_of_face() {
         }
     }
 
-    assert!(faces_iterated_over == 1);
-    assert!(edges_iterated_over == 3);
+    assert_eq!(faces_iterated_over, 1);
+    assert_eq!(edges_iterated_over, 3);
 }
 
 #[test]
@@ -134,8 +130,8 @@ fn can_iterate_over_vertices_of_face() {
         }
     }
 
-    assert!(faces_iterated_over == 1);
-    assert!(vertices_iterated_over == 3);
+    assert_eq!(faces_iterated_over, 1);
+    assert_eq!(vertices_iterated_over, 3);
 }
 
 #[test]
@@ -167,11 +163,17 @@ fn can_add_triangles_to_mesh() {
     let twin_b = mesh.face(f2).edge_index;
     assert!(twin_b.is_valid());
 
-    assert!(mesh.edge(twin_a).twin_index == twin_b);
-    assert!(mesh.edge(twin_b).twin_index == twin_a);
+    assert_eq!(mesh.edge(twin_a).twin_index, twin_b);
+    assert_eq!(mesh.edge(twin_b).twin_index, twin_a);
 
-    assert!(mesh.edge(twin_a).vertex_index == mesh.edge_fn(twin_b).next().vertex().index);
-    assert!(mesh.edge(twin_b).vertex_index == mesh.edge_fn(twin_a).next().vertex().index);
+    assert_eq!(
+        mesh.edge(twin_a).vertex_index,
+        mesh.edge_fn(twin_b).next().vertex().index
+    );
+    assert_eq!(
+        mesh.edge(twin_b).vertex_index,
+        mesh.edge_fn(twin_a).next().vertex().index
+    );
 }
 
 #[test]
@@ -190,7 +192,7 @@ fn can_walk_and_get_mutable_ref() {
             mesh.vertex_mut(index).unwrap()
         };
         println!("{:?}", vertex);
-        assert!(vertex.edge_index.0 == 6);
+        assert_eq!(vertex.edge_index.0, 6);
         vertex.edge_index = EdgeIndex::default();
     }
 
@@ -241,32 +243,34 @@ fn can_build_a_simple_mesh() {
         mesh.set_twin_edges(edge_a, edge_b);
     }
 
-    assert!(mesh.face_fn(f1).edge().twin().face().index        == f2);
-    assert!(mesh.face_fn(f1).edge().next().twin().face().index == f3);
-    assert!(mesh.face_fn(f1).edge().prev().twin().face().index == f4);
+    let f1_edge = mesh.face_fn(f1).edge();
+    let f2_edge = mesh.face_fn(f2).edge();
+    let f3_edge = mesh.face_fn(f3).edge();
+    let f4_edge = mesh.face_fn(f4).edge();
 
-    assert!(mesh.face_fn(f2).edge().next().twin().face().index == f3);
-    assert!(mesh.face_fn(f2).edge().prev().twin().face().index == f4);
+    assert_eq!(f1_edge.twin().face().index, f2);
+    assert_eq!(f1_edge.next().twin().face().index, f3);
+    assert_eq!(f1_edge.prev().twin().face().index, f4);
 
-    assert!(mesh.face_fn(f3).edge().next().twin().face().index == f4);
-    assert!(mesh.face_fn(f3).edge().prev().twin().face().index == f2);
+    assert_eq!(f2_edge.next().twin().face().index, f3);
+    assert_eq!(f2_edge.prev().twin().face().index, f4);
 
-    assert!(mesh.face_fn(f4).edge().next().twin().face().index == f2);
-    assert!(mesh.face_fn(f4).edge().prev().twin().face().index == f3);
+    assert_eq!(f3_edge.next().twin().face().index, f4);
+    assert_eq!(f3_edge.prev().twin().face().index, f2);
 
-    assert!(mesh.face_fn(f1).edge().prev().vertex().index == mesh.face_fn(f3).edge().vertex().index);
-    assert!(mesh.face_fn(f1).edge().vertex().index        == mesh.face_fn(f4).edge().vertex().index);
-    assert!(mesh.face_fn(f1).edge().next().vertex().index == mesh.face_fn(f2).edge().vertex().index);
+    assert_eq!(f4_edge.next().twin().face().index, f2);
+    assert_eq!(f4_edge.prev().twin().face().index, f3);
 
-    assert!(mesh.face_fn(f2).edge().vertex().index == mesh.face_fn(f3).edge().next().vertex().index);
-    assert!(mesh.face_fn(f3).edge().vertex().index == mesh.face_fn(f4).edge().next().vertex().index);
+    assert_eq!(f1_edge.prev().vertex().index, f3_edge.vertex().index);
+    assert_eq!(f1_edge.vertex().index, f4_edge.vertex().index);
+    assert_eq!(f1_edge.next().vertex().index, f2_edge.vertex().index);
 
-    let f2_prev_vert = mesh.face_fn(f2).edge().prev().vertex().index;
-    let f3_prev_vert = mesh.face_fn(f3).edge().prev().vertex().index;
-    let f4_prev_vert = mesh.face_fn(f4).edge().prev().vertex().index;
-    assert!(f2_prev_vert == v4);
-    assert!(f3_prev_vert == v4);
-    assert!(f4_prev_vert == v4);
+    assert_eq!(f2_edge.vertex().index, f3_edge.next().vertex().index);
+    assert_eq!(f3_edge.vertex().index, f4_edge.next().vertex().index);
+
+    assert_eq!(f2_edge.prev().vertex().index, v4);
+    assert_eq!(f3_edge.prev().vertex().index, v4);
+    assert_eq!(f4_edge.prev().vertex().index, v4);
 }
 
 #[test]
@@ -299,5 +303,5 @@ fn can_iterate_edges_around_vertex() {
         };
         edges_enumerated += 1;
     }
-    assert!(edges_enumerated == 3);
+    assert_eq!(edges_enumerated, 3);
 }
