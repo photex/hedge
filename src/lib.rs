@@ -55,7 +55,7 @@ impl Validation for FaceIndex {
 
 
 /// Represents the point where two edges meet.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct Vertex {
     /// Index of the outgoing edge
     pub edge_index: EdgeIndex,
@@ -83,7 +83,7 @@ impl Validation for Vertex {
 
 
 /// The principle component in a half-edge mesh.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct Edge {
     /// The adjacent or 'twin' half-edge
     pub twin_index: EdgeIndex,
@@ -117,7 +117,7 @@ impl Validation for Edge {
 
 
 /// A face is defined by the looping connectivity of edges.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct Face {
     /// The "root" of an edge loop that defines this face.
     pub edge_index: EdgeIndex,
@@ -138,7 +138,7 @@ impl Validation for Face {
 }
 
 /// Function set for operations related to the Face struct
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct FaceFn<'mesh> {
     mesh: &'mesh Mesh,
     face: &'mesh Face,
@@ -167,7 +167,7 @@ impl<'mesh> Validation for FaceFn<'mesh> {
 }
 
 /// Function set for operations related to the Vertex struct
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct VertexFn<'mesh> {
     mesh: &'mesh Mesh,
     vertex: &'mesh Vertex,
@@ -196,7 +196,7 @@ impl<'mesh> Validation for VertexFn<'mesh> {
 }
 
 /// Function set for operations related to the Edge struct
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct EdgeFn<'mesh> {
     mesh: &'mesh Mesh,
     edge: &'mesh Edge,
@@ -246,6 +246,7 @@ impl<'mesh> Validation for EdgeFn<'mesh> {
 
 /// Implements the fundamental storage operations and represents the principle
 /// grouping of all components.
+#[derive(Clone)]
 pub struct Mesh {
     pub edge_list: EdgeList,
     pub vertex_list: VertexList,
