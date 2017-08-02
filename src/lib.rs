@@ -125,9 +125,7 @@ pub struct Face {
 
 impl Face {
     pub fn new(edge_index: EdgeIndex) -> Face {
-        Face {
-            edge_index
-        }
+        Face { edge_index }
     }
 }
 
@@ -268,15 +266,9 @@ impl Mesh {
     /// Vec comes from the blog http://ourmachinery.com/post/defaulting-to-zero/
     pub fn new() -> Mesh {
         Mesh {
-            edge_list: vec! [
-                Edge::default()
-            ],
-            vertex_list: vec! [
-                Vertex::default()
-            ],
-            face_list: vec! [
-                Face::default()
-            ]
+            edge_list: vec![Edge::default()],
+            vertex_list: vec![Vertex::default()],
+            face_list: vec![Face::default()],
         }
     }
 
@@ -612,7 +604,7 @@ impl Mesh {
 
                 let root_edge_index = self.add_edge(verts[0], verts[1]);
                 let mut last_edge_index = root_edge_index;
-                for i in 2 .. vert_count - 2 {
+                for i in 2..vert_count - 2 {
                     last_edge_index = self.extend_edge_loop(last_edge_index, verts[i]);
                 }
                 self.close_edge_loop(last_edge_index, root_edge_index);
