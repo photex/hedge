@@ -67,7 +67,7 @@ impl Vertex {
     pub fn new(edge_index: EdgeIndex) -> Vertex {
         Vertex {
             edge_index: edge_index,
-            attr_index: INVALID_COMPONENT_INDEX
+            attr_index: INVALID_COMPONENT_INDEX,
         }
     }
 }
@@ -144,16 +144,15 @@ impl Validation for Face {
 pub struct FaceFn<'mesh> {
     mesh: &'mesh Mesh,
     face: &'mesh Face,
-    pub index: FaceIndex
+    pub index: FaceIndex,
 }
 
 impl<'mesh> FaceFn<'mesh> {
-
     pub fn new(index: FaceIndex, mesh: &'mesh Mesh) -> FaceFn {
         FaceFn {
             mesh: mesh,
             face: mesh.face(index),
-            index: index
+            index: index,
         }
     }
 
@@ -174,16 +173,15 @@ impl<'mesh> Validation for FaceFn<'mesh> {
 pub struct VertexFn<'mesh> {
     mesh: &'mesh Mesh,
     vertex: &'mesh Vertex,
-    pub index: VertexIndex
+    pub index: VertexIndex,
 }
 
 impl<'mesh> VertexFn<'mesh> {
-
     pub fn new(index: VertexIndex, mesh: &'mesh Mesh) -> VertexFn {
         VertexFn {
             mesh: mesh,
             vertex: mesh.vertex(index),
-            index: index
+            index: index,
         }
     }
 
@@ -204,7 +202,7 @@ impl<'mesh> Validation for VertexFn<'mesh> {
 pub struct EdgeFn<'mesh> {
     mesh: &'mesh Mesh,
     edge: &'mesh Edge,
-    pub index: EdgeIndex
+    pub index: EdgeIndex,
 }
 
 impl<'mesh> EdgeFn<'mesh> {
@@ -212,7 +210,7 @@ impl<'mesh> EdgeFn<'mesh> {
         EdgeFn {
             mesh: mesh,
             edge: mesh.edge(index),
-            index: index
+            index: index,
         }
     }
 
@@ -253,7 +251,7 @@ impl<'mesh> Validation for EdgeFn<'mesh> {
 pub struct Mesh {
     pub edge_list: EdgeList,
     pub vertex_list: VertexList,
-    pub face_list: FaceList
+    pub face_list: FaceList,
 }
 
 impl fmt::Debug for Mesh {
@@ -427,7 +425,7 @@ impl Mesh {
             next_index: EdgeIndex::default(),
             prev_index: EdgeIndex::default(),
             face_index: FaceIndex::default(),
-            vertex_index: a
+            vertex_index: a,
         };
         if let Some(ref mut vert) = self.vertex_mut(a) {
             vert.edge_index = eindex_a;
@@ -438,7 +436,7 @@ impl Mesh {
             next_index: EdgeIndex::default(),
             prev_index: EdgeIndex::default(),
             face_index: FaceIndex::default(),
-            vertex_index: b
+            vertex_index: b,
         };
         if let Some(ref mut vert) = self.vertex_mut(b) {
             vert.edge_index = eindex_b;
@@ -770,7 +768,7 @@ impl Mesh {
 pub struct EdgeLoopVertices<'mesh> {
     edge_list: &'mesh EdgeList,
     initial_index: EdgeIndex,
-    current_index: EdgeIndex
+    current_index: EdgeIndex,
 }
 
 impl<'mesh> EdgeLoopVertices<'mesh> {
@@ -778,7 +776,7 @@ impl<'mesh> EdgeLoopVertices<'mesh> {
         EdgeLoopVertices {
             edge_list: edge_list,
             initial_index: index,
-            current_index: EdgeIndex::default()
+            current_index: EdgeIndex::default(),
         }
     }
 }
@@ -809,7 +807,7 @@ impl<'mesh> Iterator for EdgeLoopVertices<'mesh> {
 pub struct EdgeLoop<'mesh> {
     edge_list: &'mesh EdgeList,
     initial_index: EdgeIndex,
-    current_index: EdgeIndex
+    current_index: EdgeIndex,
 }
 
 impl<'mesh> EdgeLoop<'mesh> {
@@ -817,7 +815,7 @@ impl<'mesh> EdgeLoop<'mesh> {
         EdgeLoop {
             edge_list: edge_list,
             initial_index: index,
-            current_index: EdgeIndex::default()
+            current_index: EdgeIndex::default(),
         }
     }
 }
@@ -879,14 +877,14 @@ impl<'mesh> Iterator for EdgesAroundVertex<'mesh> {
 /// perhaps do this in the future.
 pub struct Faces {
     face_count: usize,
-    previous_index: FaceIndex
+    previous_index: FaceIndex,
 }
 
 impl Faces {
     pub fn new(face_count: usize) -> Faces {
         Faces {
             face_count: face_count,
-            previous_index: FaceIndex::default()
+            previous_index: FaceIndex::default(),
         }
     }
 }
