@@ -1,4 +1,3 @@
-use log::*;
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::Enumerate;
@@ -39,6 +38,10 @@ impl<D: ElementData + Default> ElementBuffer<D> {
         self.buffer.len() - self.free_cells.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
+    }
+
     pub fn has_inactive_cells(&self) -> bool {
         !self.free_cells.is_empty()
     }
@@ -57,7 +60,7 @@ impl<D: ElementData + Default> ElementBuffer<D> {
     pub fn enumerate(&self) -> Enumerate<Iter<MeshElement<D>>> {
         let mut it = self.buffer.iter().enumerate();
         let _ = it.next(); // Always skip the first element since we know it's invalid
-        return it;
+        it
     }
 
     pub fn active_cells(&self) -> impl Iterator<Item = (usize, &MeshElement<D>)> {
@@ -155,7 +158,7 @@ impl<D: ElementData + Default> ElementBuffer<D> {
             .map(|e| e.0);
         if let (Some(inactive_offset), Some(active_offset)) = (inactive_offset, active_offset) {
             if active_offset < inactive_offset {
-                debug!("Buffer appears to be successfully sorted!");
+                log::debug!("Buffer appears to be successfully sorted!");
                 // by the time this is true we should have sorted/swapped
                 // all elements so that the inactive inactive elements
                 // make up the tail of the buffer.
@@ -164,7 +167,7 @@ impl<D: ElementData + Default> ElementBuffer<D> {
                 Some((inactive_offset as u32, active_offset as u32))
             }
         } else {
-            debug!("No more swap pairs.");
+            log::debug!("No more swap pairs.");
             None
         }
     }
@@ -199,7 +202,7 @@ impl Kernel {
                         let root_face_index = root_edge.data.borrow().face_index;
                         *index != root_face_index
                     } else {
-                        warn!(
+                        log::warn!(
                             "The root edge of the face at {:?} points to invalid edge.",
                             root_edge_index
                         );
@@ -245,7 +248,7 @@ impl Kernel {
                     if let Some(edge) = self.edge_buffer.get(&vert_edge_index) {
                         *vert_index != edge.data.borrow().vertex_index
                     } else {
-                        warn!("Vertex at {:?} has an invalid edge index.", vert_index);
+                        log::warn!("Vertex at {:?} has an invalid edge index.", vert_index);
                         false
                     }
                 })
@@ -269,49 +272,45 @@ impl Kernel {
             // swap the first active cell from the end of the
             // buffer with first inactive cell from the front
             // of the buffer.
-            loop {
-                if let Some(offsets) = self.edge_buffer.next_swap_pair() {
-                    let inactive_offset = offsets.0;
-                    let active_offset = offsets.1;
+            while let Some(offsets) = self.edge_buffer.next_swap_pair() {
+                let inactive_offset = offsets.0;
+                let active_offset = offsets.1;
 
-                    self.edge_buffer
-                        .buffer
-                        .swap(inactive_offset as usize, active_offset as usize);
-                    let swapped = &self.edge_buffer.buffer[inactive_offset as usize];
-                    let swapped_data = swapped.data();
-                    let swapped_index =
-                        Index::with_generation(inactive_offset as u32, swapped.generation.get());
+                self.edge_buffer
+                    .buffer
+                    .swap(inactive_offset as usize, active_offset as usize);
+                let swapped = &self.edge_buffer.buffer[inactive_offset as usize];
+                let swapped_data = swapped.data();
+                let swapped_index =
+                    Index::with_generation(inactive_offset as u32, swapped.generation.get());
 
-                    if let Some(next_edge) = self.edge_buffer.get(&swapped_data.next_index) {
-                        next_edge.data_mut().prev_index = swapped_index;
-                    }
-                    if let Some(prev_edge) = self.edge_buffer.get(&swapped_data.prev_index) {
-                        prev_edge.data_mut().next_index = swapped_index;
-                    }
-                    if let Some(twin_edge) = self.edge_buffer.get(&swapped_data.twin_index) {
-                        twin_edge.data_mut().twin_index = swapped_index;
-                    }
+                if let Some(next_edge) = self.edge_buffer.get(&swapped_data.next_index) {
+                    next_edge.data_mut().prev_index = swapped_index;
+                }
+                if let Some(prev_edge) = self.edge_buffer.get(&swapped_data.prev_index) {
+                    prev_edge.data_mut().next_index = swapped_index;
+                }
+                if let Some(twin_edge) = self.edge_buffer.get(&swapped_data.twin_index) {
+                    twin_edge.data_mut().twin_index = swapped_index;
+                }
 
-                    // For faces and vertices we only want to update the
-                    // associated edge index when it matched the original
-                    // buffer location.
-                    // I'm doing this in case the associated root edge
-                    // index for these elements is meaningful or important.
+                // For faces and vertices we only want to update the
+                // associated edge index when it matched the original
+                // buffer location.
+                // I'm doing this in case the associated root edge
+                // index for these elements is meaningful or important.
 
-                    if let Some(face) = self.face_buffer.get(&swapped_data.face_index) {
-                        let mut face_data = face.data_mut();
-                        if face_data.edge_index.offset == active_offset {
-                            face_data.edge_index = swapped_index;
-                        }
+                if let Some(face) = self.face_buffer.get(&swapped_data.face_index) {
+                    let mut face_data = face.data_mut();
+                    if face_data.edge_index.offset == active_offset {
+                        face_data.edge_index = swapped_index;
                     }
-                    if let Some(vertex) = self.vertex_buffer.get(&swapped_data.vertex_index) {
-                        let mut vertex_data = vertex.data_mut();
-                        if vertex_data.edge_index.offset == active_offset {
-                            vertex_data.edge_index = swapped_index;
-                        }
+                }
+                if let Some(vertex) = self.vertex_buffer.get(&swapped_data.vertex_index) {
+                    let mut vertex_data = vertex.data_mut();
+                    if vertex_data.edge_index.offset == active_offset {
+                        vertex_data.edge_index = swapped_index;
                     }
-                } else {
-                    break;
                 }
             }
             self.edge_buffer.truncate_inactive();
@@ -329,27 +328,23 @@ impl Kernel {
             // at its original location.
             // This also means we can't use the more
             // convienient sort approach.
-            loop {
-                if let Some(offsets) = self.point_buffer.next_swap_pair() {
-                    let inactive_offset = offsets.0;
-                    let active_offset = offsets.1;
+            while let Some(offsets) = self.point_buffer.next_swap_pair() {
+                let inactive_offset = offsets.0;
+                let active_offset = offsets.1;
 
-                    self.point_buffer
-                        .buffer
-                        .swap(inactive_offset as usize, active_offset as usize);
-                    let swapped = &self.point_buffer.buffer[inactive_offset as usize];
-                    let swapped_index =
-                        Index::with_generation(inactive_offset as u32, swapped.generation.get());
+                self.point_buffer
+                    .buffer
+                    .swap(inactive_offset as usize, active_offset as usize);
+                let swapped = &self.point_buffer.buffer[inactive_offset as usize];
+                let swapped_index =
+                    Index::with_generation(inactive_offset as u32, swapped.generation.get());
 
-                    self.vertex_buffer.buffer[1..]
-                        .iter()
-                        .filter(|v| v.is_active() && v.data().point_index.offset == active_offset)
-                        .for_each(|v| {
-                            v.data_mut().point_index = swapped_index;
-                        });
-                } else {
-                    break;
-                }
+                self.vertex_buffer.buffer[1..]
+                    .iter()
+                    .filter(|v| v.is_active() && v.data().point_index.offset == active_offset)
+                    .for_each(|v| {
+                        v.data_mut().point_index = swapped_index;
+                    });
             }
             self.vertex_buffer.truncate_inactive();
         }

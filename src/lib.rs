@@ -2,21 +2,21 @@
 //! An index based half-edge mesh implementation.
 //!
 
-use std::fmt;
-use std::sync::atomic;
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::cmp;
-use std::cell::{Cell, RefCell, Ref, RefMut};
-use std::marker::PhantomData;
+use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
+use std::sync::atomic;
 
-pub use crate::kernel::*;
 pub use crate::function_sets::*;
 pub use crate::iterators::*;
+pub use crate::kernel::*;
 
-pub mod kernel;
-pub mod utils;
 pub mod function_sets;
 pub mod iterators;
+pub mod kernel;
+pub mod utils;
 
 pub type Tag = u32;
 pub type Offset = u32;
@@ -132,7 +132,7 @@ impl<D: ElementData + Default> Default for MeshElement<D> {
             tag: Cell::new(0),
             generation: Cell::new(1),
             status: Cell::new(ElementStatus::INACTIVE),
-            data: RefCell::default()
+            data: RefCell::default(),
         }
     }
 }
@@ -205,7 +205,7 @@ pub struct EdgeData {
 pub type Edge = MeshElement<EdgeData>;
 pub type EdgeIndex = Index<Edge>;
 impl ElementData for EdgeData {}
-impl ElementIndex for  EdgeIndex {}
+impl ElementIndex for EdgeIndex {}
 impl Edge {
     /// Returns true when this edge has a previous and next edge.
     pub fn is_connected(&self) -> bool {
@@ -218,11 +218,11 @@ impl IsValid for Edge {
     /// and `is_connected`
     fn is_valid(&self) -> bool {
         let data = self.data.borrow();
-        self.is_active() &&
-            data.vertex_index.is_valid() &&
-            data.twin_index.is_valid() &&
-            data.next_index.is_valid() &&
-            data.prev_index.is_valid()
+        self.is_active()
+            && data.vertex_index.is_valid()
+            && data.twin_index.is_valid()
+            && data.next_index.is_valid()
+            && data.prev_index.is_valid()
     }
 }
 
@@ -240,7 +240,10 @@ impl ElementData for VertexData {}
 impl ElementIndex for VertexIndex {}
 impl Vertex {
     pub fn new(edge_index: EdgeIndex, point_index: PointIndex) -> Self {
-        Vertex::with_data(VertexData { edge_index, point_index })
+        Vertex::with_data(VertexData {
+            edge_index,
+            point_index,
+        })
     }
 
     pub fn for_edge(edge_index: EdgeIndex) -> Self {
@@ -300,9 +303,7 @@ impl PointData {
 }
 impl Default for PointData {
     fn default() -> Self {
-        PointData {
-            position: [0.0; 3],
-        }
+        PointData { position: [0.0; 3] }
     }
 }
 pub type Point = MeshElement<PointData>;
@@ -355,64 +356,66 @@ impl fmt::Debug for Mesh {
     }
 }
 
-impl Mesh {
-    pub fn new() -> Mesh {
+impl Default for Mesh {
+    fn default() -> Mesh {
         Mesh {
             kernel: Kernel::default(),
             tag: atomic::AtomicU32::new(1),
         }
     }
+}
 
+impl Mesh {
     fn next_tag(&self) -> Tag {
         self.tag.fetch_add(1, atomic::Ordering::SeqCst)
     }
 
     /// Returns a `FaceFn` for the given index.
     pub fn face(&self, index: FaceIndex) -> FaceFn {
-        FaceFn::new(index, &self)
+        FaceFn::new(index, self)
     }
 
     pub fn face_count(&self) -> usize {
         self.kernel.face_buffer.len() - 1
     }
 
-    pub fn faces(&self) -> impl Iterator<Item=FaceFn> {
-        self.kernel.face_buffer.active_cells()
-            .map(move |(offset, _)| {
-                FaceFn::new(FaceIndex::new(offset as u32), self)
-            })
+    pub fn faces(&self) -> impl Iterator<Item = FaceFn> {
+        self.kernel
+            .face_buffer
+            .active_cells()
+            .map(move |(offset, _)| FaceFn::new(FaceIndex::new(offset as u32), self))
     }
 
     /// Returns an `EdgeFn` for the given index.
     pub fn edge(&self, index: EdgeIndex) -> EdgeFn {
-        EdgeFn::new(index, &self)
+        EdgeFn::new(index, self)
     }
 
     pub fn edge_count(&self) -> usize {
         self.kernel.edge_buffer.len() - 1
     }
 
-    pub fn edges(&self) -> impl Iterator<Item=EdgeFn> {
-        self.kernel.edge_buffer.active_cells()
-            .map(move |(offset, _)| {
-                EdgeFn::new(EdgeIndex::new(offset as u32), self)
-            })
+    pub fn edges(&self) -> impl Iterator<Item = EdgeFn> {
+        self.kernel
+            .edge_buffer
+            .active_cells()
+            .map(move |(offset, _)| EdgeFn::new(EdgeIndex::new(offset as u32), self))
     }
 
     /// Returns a `VertexFn` for the given index.
     pub fn vertex(&self, index: VertexIndex) -> VertexFn {
-        VertexFn::new(index, &self)
+        VertexFn::new(index, self)
     }
 
     pub fn vertex_count(&self) -> usize {
         self.kernel.vertex_buffer.len() - 1
     }
 
-    pub fn vertices(&self) -> impl Iterator<Item=VertexFn> {
-        self.kernel.vertex_buffer.active_cells()
-            .map(move |(offset, _)| {
-                VertexFn::new(VertexIndex::new(offset as u32), self)
-            })
+    pub fn vertices(&self) -> impl Iterator<Item = VertexFn> {
+        self.kernel
+            .vertex_buffer
+            .active_cells()
+            .map(move |(offset, _)| VertexFn::new(VertexIndex::new(offset as u32), self))
     }
 
     pub fn point_count(&self) -> usize {
@@ -420,19 +423,22 @@ impl Mesh {
     }
 
     pub fn add_element<E>(&mut self, element: E) -> Index<E>
-        where kernel::Kernel: AddElement<E>
+    where
+        kernel::Kernel: AddElement<E>,
     {
         self.kernel.add_element(element)
     }
 
     pub fn remove_element<E>(&mut self, index: Index<E>)
-        where kernel::Kernel: RemoveElement<E>
+    where
+        kernel::Kernel: RemoveElement<E>,
     {
         self.kernel.remove_element(index)
     }
 
     pub fn get_element<E>(&self, index: &Index<E>) -> Option<&E>
-        where kernel::Kernel: GetElement<E>
+    where
+        kernel::Kernel: GetElement<E>,
     {
         self.kernel.get_element(index)
     }
@@ -459,7 +465,7 @@ mod tests {
         let point = Point::default();
         debug!("{:?}", point);
 
-        let mesh = Mesh::new();
+        let mesh = Mesh::default();
         debug!("{:?}", mesh);
     }
 
@@ -481,67 +487,66 @@ mod tests {
     #[test]
     fn default_edge_is_invalid() {
         let edge = Edge::default();
-        assert_eq!(edge.is_valid(), false);
+        assert!(!edge.is_valid());
     }
 
     #[test]
     fn default_vertex_is_invalid() {
         let vertex = Vertex::default();
-        assert_eq!(vertex.is_valid(), false);
+        assert!(!vertex.is_valid());
     }
 
     #[test]
     fn default_face_is_invalid() {
         let face = Face::default();
-        assert_eq!(face.is_valid(), false);
+        assert!(!face.is_valid());
     }
 
     #[test]
     fn default_point_is_invalid() {
         let point = Point::default();
-        assert_eq!(point.is_valid(), false);
+        assert!(!point.is_valid());
     }
 
     #[test]
     fn default_point_is_valid_after_added_to_mesh() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
 
         let pindex = {
             let point = Point::default();
-            assert_eq!(point.is_valid(), false);
             mesh.add_element(point)
         };
 
-        assert_eq!(mesh.get_element(&pindex).is_some(), true);
+        assert!(mesh.get_element(&pindex).is_some());
     }
 
     #[test]
     fn initial_mesh_has_default_elements() {
         let _ = env_logger::try_init();
-        let mesh = Mesh::new();
+        let mesh = Mesh::default();
 
         assert_eq!(mesh.edge_count(), 0);
-        assert_eq!(mesh.get_element(&EdgeIndex::new(0)).is_some(), false);
+        assert!(mesh.get_element(&EdgeIndex::new(0)).is_none());
         assert_eq!(mesh.kernel.edge_buffer.len(), 1);
 
         assert_eq!(mesh.face_count(), 0);
-        assert_eq!(mesh.get_element(&FaceIndex::new(0)).is_some(), false);
+        assert!(mesh.get_element(&FaceIndex::new(0)).is_none());
         assert_eq!(mesh.kernel.face_buffer.len(), 1);
 
         assert_eq!(mesh.vertex_count(), 0);
-        assert_eq!(mesh.get_element(&VertexIndex::new(0)).is_some(), false);
+        assert!(mesh.get_element(&VertexIndex::new(0)).is_none());
         assert_eq!(mesh.kernel.vertex_buffer.len(), 1);
 
         assert_eq!(mesh.point_count(), 0);
-        assert_eq!(mesh.get_element(&PointIndex::new(0)).is_some(), false);
+        assert!(mesh.get_element(&PointIndex::new(0)).is_none());
         assert_eq!(mesh.kernel.point_buffer.len(), 1);
     }
 
     #[test]
     fn can_add_and_remove_vertices() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
         let v0 = mesh.add_element(Vertex::default());
         assert_eq!(mesh.vertex_count(), 1);
         assert_eq!(mesh.kernel.vertex_buffer.len(), 2);
@@ -553,7 +558,7 @@ mod tests {
     #[test]
     fn can_add_and_remove_edges() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
         let e0 = mesh.add_element(Edge::default());
         assert_eq!(mesh.edge_count(), 1);
         assert_eq!(mesh.kernel.edge_buffer.len(), 2);
@@ -565,7 +570,7 @@ mod tests {
     #[test]
     fn can_add_and_remove_faces() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
         let f0 = mesh.add_element(Face::default());
         assert_eq!(mesh.face_count(), 1);
         assert_eq!(mesh.kernel.face_buffer.len(), 2);
@@ -577,7 +582,7 @@ mod tests {
     #[test]
     fn can_add_and_remove_points() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
         let p0 = mesh.add_element(Point::default());
         assert_eq!(mesh.point_count(), 1);
         assert_eq!(mesh.kernel.point_buffer.len(), 2);
@@ -589,7 +594,7 @@ mod tests {
     #[test]
     fn can_build_a_simple_mesh_manually() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
 
         let p0 = mesh.add_element(Point::new(-1.0, 0.0, 0.0));
         let p1 = mesh.add_element(Point::new(1.0, 0.0, 0.0));
@@ -625,7 +630,7 @@ mod tests {
     #[test]
     fn can_iterate_over_faces() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
 
         mesh.add_element(Face::new(EdgeIndex::new(1)));
         mesh.add_element(Face::new(EdgeIndex::new(4)));
@@ -646,7 +651,7 @@ mod tests {
     #[test]
     fn can_iterate_over_vertices() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
 
         mesh.add_element(Vertex::new(EdgeIndex::new(1), PointIndex::new(1)));
         mesh.add_element(Vertex::new(EdgeIndex::new(1), PointIndex::new(1)));

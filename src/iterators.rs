@@ -1,8 +1,6 @@
 //! Iterators for simple or common mesh traversal patterns.
 
-use log::*;
 use super::*;
-
 
 pub struct VertexCirculator<'mesh> {
     tag: Tag,
@@ -17,9 +15,7 @@ impl<'mesh> VertexCirculator<'mesh> {
             tag,
             vert,
             last_edge: None,
-            central_point: vert.data()
-                .map(|d| d.point_index)
-                .unwrap_or(PointIndex::default())
+            central_point: vert.data().map(|d| d.point_index).unwrap_or_default(),
         }
     }
 }
@@ -30,34 +26,37 @@ impl<'mesh> Iterator for VertexCirculator<'mesh> {
     fn next(&mut self) -> Option<Self::Item> {
         self.last_edge = if let Some(last_edge) = self.last_edge {
             let next_edge = last_edge.prev().twin();
-            next_edge.element().and_then(|e| {
-                if e.tag() == self.tag {
-                    debug!("Encountered previously tagged edge.");
-                    None
-                } else {
-                    e.set_tag(self.tag);
-                    Some(next_edge)
-                }
-            }).and_then(|next_edge| {
-                if next_edge.is_boundary() {
-                    warn!("Vertex circulator terminated due to boundary edge.");
-                    None
-                } else if let Some(pindex) = next_edge.vertex().data().map(|d| d.point_index) {
-                    if pindex == self.central_point {
-                        Some(next_edge)
+            next_edge
+                .element()
+                .and_then(|e| {
+                    if e.tag() == self.tag {
+                        log::debug!("Encountered previously tagged edge.");
+                        None
                     } else {
-                        debug!("Ending iteration because vertex attributes do not match.");
+                        e.set_tag(self.tag);
+                        Some(next_edge)
+                    }
+                })
+                .and_then(|next_edge| {
+                    if next_edge.is_boundary() {
+                        log::warn!("Vertex circulator terminated due to boundary edge.");
+                        None
+                    } else if let Some(pindex) = next_edge.vertex().data().map(|d| d.point_index) {
+                        if pindex == self.central_point {
+                            Some(next_edge)
+                        } else {
+                            log::debug!("Ending iteration because vertex attributes do not match.");
+                            None
+                        }
+                    } else {
                         None
                     }
-                } else {
-                    None
-                }
-            })
+                })
         } else {
             let edge = self.vert.edge();
-            edge.element().and_then(|e| {
+            edge.element().map(|e| {
                 e.set_tag(self.tag);
-                Some(edge)
+                edge
             })
         };
         self.last_edge
@@ -75,7 +74,7 @@ impl<'mesh> FaceEdges<'mesh> {
         FaceEdges {
             tag,
             root_edge: face.edge(),
-            last_edge: None
+            last_edge: None,
         }
     }
 }
@@ -86,7 +85,8 @@ impl<'mesh> Iterator for FaceEdges<'mesh> {
     fn next(&mut self) -> Option<Self::Item> {
         self.last_edge = if let Some(last_edge) = self.last_edge {
             let next_edge = last_edge.next();
-            next_edge.element()
+            next_edge
+                .element()
                 .and_then(|edge| {
                     if edge.tag() == self.tag {
                         None
@@ -118,7 +118,7 @@ impl<'mesh> FaceVertices<'mesh> {
         let inner_iter = FaceEdges {
             tag,
             root_edge: face.edge(),
-            last_edge: None
+            last_edge: None,
         };
         FaceVertices { inner_iter }
     }
@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn can_iterate_over_edges_of_face() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
 
         let p0 = mesh.add_element(Point::new(-1.0, 0.0, 0.0));
         let p1 = mesh.add_element(Point::new(1.0, 0.0, 0.0));
@@ -159,11 +159,7 @@ mod tests {
         let mut iter_count = 0;
         for edge in mesh.face(f0).edges() {
             assert!(iter_count < 3);
-            if edge.index == e0 {
-                iter_count += 1;
-            } else if edge.index == e1 {
-                iter_count += 1;
-            } else if edge.index == e2 {
+            if edge.index == e0 || edge.index == e1 || edge.index == e2 {
                 iter_count += 1;
             } else {
                 unreachable!();
@@ -175,7 +171,7 @@ mod tests {
     #[test]
     fn can_iterate_over_vertices_of_face() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
 
         let p0 = mesh.add_element(Point::new(-1.0, 0.0, 0.0));
         let p1 = mesh.add_element(Point::new(1.0, 0.0, 0.0));
@@ -195,11 +191,7 @@ mod tests {
         let mut iter_count = 0;
         for vert in mesh.face(f0).vertices() {
             assert!(iter_count < 3);
-            if vert.index == v0 {
-                iter_count += 1;
-            } else if vert.index == v1 {
-                iter_count += 1;
-            } else if vert.index == v2 {
+            if vert.index == v0 || vert.index == v1 || vert.index == v2 {
                 iter_count += 1;
             } else {
                 unreachable!();
@@ -250,7 +242,7 @@ mod tests {
 
         /////////////////////////////////
 
-        let _v9  = mesh.add_element(Vertex::at_point(points[3]));
+        let _v9 = mesh.add_element(Vertex::at_point(points[3]));
         let _v10 = mesh.add_element(Vertex::at_point(points[0]));
         let v11 = mesh.add_element(Vertex::at_point(points[4]));
 
@@ -263,13 +255,13 @@ mod tests {
         let f3 = mesh.add_element(Face::default());
         utils::assign_face_to_loop(mesh, e9, f3);
 
-        return v2;
+        v2
     }
 
     #[test]
     fn can_iterate_around_vertex() {
         let _ = env_logger::try_init();
-        let mut mesh = Mesh::new();
+        let mut mesh = Mesh::default();
 
         let points = [
             mesh.add_element(Point::new(-1.0, 0.0, 0.0)),
