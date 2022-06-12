@@ -1,0 +1,21 @@
+[package]
+name = "hedge-core"
+version = "0.3.0"
+authors = ["Chip Collier <photex@gmail.com>"]
+description = "An index based half-edge mesh implementation."
+keywords = ["halfedge", "half-edge", "mesh", "graphics", "meshes"]
+categories = ["data-structures", "graphics"]
+license = "MPL-2.0"
+documentation = "https://docs.rs/hedge"
+homepage = "https://git.sr.ht/~photex/hedge"
+repository = "https://git.sr.ht/~photex/hedge"
+readme = "README.md"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+nalgebra-glm = "0.17"
+hedge-element-buffer = { path="../hedge-element-buffer" }
+
+[dev-dependencies]
+env_logger = "0.9"

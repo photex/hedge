@@ -18,113 +18,16 @@ pub mod iterators;
 pub mod kernel;
 pub mod utils;
 
-pub type Tag = u32;
-pub type Offset = u32;
-pub type Generation = u32;
+use hedge_element_buffer::prelude::*;
+
+pub use hedge_element_buffer as buffer;
+
+
 pub type Position = [f32; 3];
 pub type Normal = [f32; 3];
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Marker trait for Index types
-pub trait ElementIndex {}
-
-/// Marker trait for structs holding element specific data
-pub trait ElementData {}
-
-/// An interface for asserting the validity of components and indices of the mesh.
-pub trait IsValid {
-    fn is_valid(&self) -> bool;
-}
-
-pub trait IsActive {
-    fn is_active(&self) -> bool;
-}
-
-pub trait Taggable {
-    fn tag(&self) -> Tag;
-    fn set_tag(&self, tag: Tag);
-}
-
-pub trait Storable {
-    fn generation(&self) -> Generation;
-    fn set_generation(&self, generation: Generation);
-    fn status(&self) -> ElementStatus;
-    fn set_status(&self, status: ElementStatus);
-}
-
-/// Our default value for uninitialized or unconnected components in the mesh.
-pub const INVALID_COMPONENT_OFFSET: Offset = 0;
-
-/// Type-safe index into kernel storage.
-#[derive(Default, Debug, Clone, Eq)]
-pub struct Index<T> {
-    pub offset: Offset,
-    pub generation: Generation,
-    _marker: PhantomData<T>,
-}
-
-impl<T: Clone> Copy for Index<T> {}
-
-impl<T> Hash for Index<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.offset.hash(state);
-        self.generation.hash(state);
-    }
-}
-
-impl<T> Index<T> {
-    pub fn new(offset: Offset) -> Index<T> {
-        Index {
-            offset,
-            generation: 0,
-            _marker: PhantomData::default(),
-        }
-    }
-
-    pub fn with_generation(offset: Offset, generation: Generation) -> Index<T> {
-        Index {
-            offset,
-            generation,
-            _marker: PhantomData::default(),
-        }
-    }
-}
-
-impl<T> PartialOrd for Index<T> {
-    fn partial_cmp(&self, other: &Index<T>) -> Option<cmp::Ordering> {
-        // Only the offset should matter when it comes to ordering
-        self.offset.partial_cmp(&other.offset)
-    }
-}
-
-impl<T> PartialEq for Index<T> {
-    fn eq(&self, other: &Index<T>) -> bool {
-        self.offset.eq(&other.offset) && self.generation.eq(&other.generation)
-    }
-}
-
-impl<T> IsValid for Index<T> {
-    fn is_valid(&self) -> bool {
-        self.offset != INVALID_COMPONENT_OFFSET
-    }
-}
-
-/// Whether or not a cell is current or 'removed'
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
-pub enum ElementStatus {
-    ACTIVE,
-    INACTIVE,
-}
-
-/// Trait for accessing Mesh element properties.
-#[derive(Debug, Clone)]
-pub struct MeshElement<D: ElementData + Default> {
-    tag: Cell<Tag>,
-    generation: Cell<Generation>,
-    status: Cell<ElementStatus>,
-    data: RefCell<D>,
-}
 
 impl<D: ElementData + Default> Default for MeshElement<D> {
     fn default() -> Self {

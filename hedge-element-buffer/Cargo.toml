@@ -1,0 +1,19 @@
+[package]
+name = "hedge-element-buffer"
+version = "0.3.0"
+authors = ["Chip Collier <photex@gmail.com>"]
+description = "A simple wrapper around Vec for use in Hedge. (You're probably looking for slot-map and not this crate)"
+keywords = ["halfedge", "half-edge", "mesh", "graphics", "meshes"]
+categories = ["data-structures", "graphics"]
+license = "MPL-2.0"
+documentation = "https://docs.rs/hedge"
+homepage = "https://git.sr.ht/~photex/hedge"
+repository = "https://git.sr.ht/~photex/hedge"
+readme = "README.md"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+
+[dev-dependencies]
+env_logger = "0.9"
