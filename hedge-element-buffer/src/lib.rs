@@ -94,6 +94,21 @@ impl<D: Default> fmt::Debug for ElementBuffer<D> {
 }
 
 impl<D: Default> ElementBuffer<D> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        let mut out = Self {
+            buffer: Vec::with_capacity(capacity + 1),
+            generations: Vec::with_capacity(capacity + 1),
+            free_cells: HashSet::new(),
+        };
+        out.buffer.push(Default::default());
+        out.generations.push(Default::default());
+        out
+    }
+
     #[inline(always)]
     fn is_active_cell(&self, offset: Offset) -> bool {
         !self.free_cells.contains(&offset)
@@ -230,7 +245,7 @@ impl<D: Default> IndexMut<Handle<D>> for ElementBuffer<D> {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub mod prelude {
-    pub use super::{Generation, Handle, Tag};
+    pub use super::{ElementBuffer, Generation, Handle, Offset, Tag};
 }
 
 #[cfg(test)]
