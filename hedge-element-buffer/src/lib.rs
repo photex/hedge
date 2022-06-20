@@ -109,6 +109,15 @@ impl<D: Default> ElementBuffer<D> {
         out
     }
 
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+        self.generations.clear();
+        self.free_cells.clear();
+
+        self.buffer.push(Default::default());
+        self.generations.push(Default::default());
+    }
+
     #[inline(always)]
     fn is_active_cell(&self, offset: Offset) -> bool {
         !self.free_cells.contains(&offset)
@@ -183,6 +192,7 @@ impl<D: Default> ElementBuffer<D> {
         self.buffer.get_mut(handle.offset as usize)
     }
 
+    /// .
     pub fn push(&mut self, element: D) -> Handle<D> {
         if let Some(offset) = self.free_cells.iter().next().cloned() {
             self.free_cells.remove(&offset);
@@ -198,33 +208,27 @@ impl<D: Default> ElementBuffer<D> {
         }
     }
 
+    /// .
     pub fn remove(&mut self, handle: Handle<D>) {
         self.free_cells.insert(handle.offset);
         self.generations[handle.offset as usize] += 1;
     }
 
-    // fn next_swap_pair(&self) -> Option<(Offset, Offset)> {
-    //     let inactive_offset = self.enumerate().find(|e| !e.1.is_active()).map(|e| e.0);
-    //     let active_offset = self
-    //         .enumerate()
-    //         .rev()
-    //         .find(|e| e.1.is_active())
-    //         .map(|e| e.0);
-    //     if let (Some(inactive_offset), Some(active_offset)) = (inactive_offset, active_offset) {
-    //         if active_offset < inactive_offset {
-    //             log::debug!("Buffer appears to be successfully sorted!");
-    //             // by the time this is true we should have sorted/swapped
-    //             // all elements so that the inactive inactive elements
-    //             // make up the tail of the buffer.
-    //             None
-    //         } else {
-    //             Some((inactive_offset as u32, active_offset as u32))
-    //         }
-    //     } else {
-    //         log::debug!("No more swap pairs.");
-    //         None
-    //     }
-    // }
+    fn build_rectify_map(&self) -> Vec<(u32, u32)> {
+        let active_cell_offsets = (1..=self.buffer.len())
+            .map(|idx| (self.buffer.len() - idx) as u32)
+            .filter(|idx| !self.free_cells.contains(idx));
+        let free_cells =
+            (0..((self.buffer.len() / 2) as u32)).filter(|idx| self.free_cells.contains(idx));
+        free_cells
+            .zip(active_cell_offsets)
+            .map(|t| (t.0, t.1))
+            .collect()
+    }
+
+    pub fn compact(&mut self) {
+        let _rectify_map = self.build_rectify_map();
+    }
 }
 
 impl<D: Default> Index<Handle<D>> for ElementBuffer<D> {
@@ -392,6 +396,7 @@ mod tests {
         buffer.remove(i3);
 
         assert_eq!(buffer.len(), 3);
+        assert_eq!(buffer.free_cells.len(), 2);
 
         let foos: Vec<u32> = buffer.iter().map(|(_, e)| e.foo).collect();
         assert_eq!(foos[0], 0);
@@ -445,5 +450,27 @@ mod tests {
 
         assert_eq!(buffer[i5].foo, 5);
         assert_eq!(buffer[i6].foo, 6);
+    }
+
+    #[test]
+    fn rectify_map_basics() {
+        let mut buffer = TestBuffer::default();
+        let _i1 = buffer.push(TestElement { foo: 0 });
+        let i2 = buffer.push(TestElement { foo: 1 });
+        let _i3 = buffer.push(TestElement { foo: 2 });
+        let i4 = buffer.push(TestElement { foo: 3 });
+        let i5 = buffer.push(TestElement { foo: 4 });
+
+        buffer.remove(i2);
+        buffer.remove(i5);
+
+        assert!(buffer.has_inactive_cells());
+        let rectify_map = buffer.build_rectify_map();
+        assert_eq!(rectify_map.len(), 1);
+        assert_eq!(rectify_map[0], (i2.offset, i4.offset));
+
+        buffer.clear();
+        let rectify_map = buffer.build_rectify_map();
+        assert!(rectify_map.is_empty());
     }
 }
