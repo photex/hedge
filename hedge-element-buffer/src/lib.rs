@@ -475,7 +475,7 @@ mod tests {
     }
 
     #[test]
-    fn rectify_plan_expectations() {
+    fn rectify_plan_simple_expectations() {
         let mut buffer = TestBuffer::default();
         let i1 = buffer.push(TestElement { foo: 0 });
         let i2 = buffer.push(TestElement { foo: 1 });
@@ -494,5 +494,59 @@ mod tests {
         let plan = buffer.build_rectify_plan();
         assert_eq!(plan[0], (i1.offset, i5.offset));
         assert_eq!(plan.len(), 1);
+
+        ///////////////////////////////////
+
+        buffer.clear();
+
+        let i1 = buffer.push(TestElement { foo: 0 });
+        let i2 = buffer.push(TestElement { foo: 1 });
+        let i3 = buffer.push(TestElement { foo: 2 });
+        let i4 = buffer.push(TestElement { foo: 3 });
+        let i5 = buffer.push(TestElement { foo: 4 });
+
+        buffer.remove(i1);
+        buffer.remove(i3);
+        buffer.remove(i4);
+        buffer.remove(i5);
+
+        let plan = buffer.build_rectify_plan();
+        assert_eq!(plan[0], (i1.offset, i2.offset));
+        assert_eq!(plan.len(), 1);
+
+        //////////////////////////////////
+
+        buffer.clear();
+
+        let _i1 = buffer.push(TestElement { foo: 0 });
+        let i2 = buffer.push(TestElement { foo: 1 });
+        let _i3 = buffer.push(TestElement { foo: 2 });
+        let i4 = buffer.push(TestElement { foo: 3 });
+        let i5 = buffer.push(TestElement { foo: 4 });
+
+        buffer.remove(i2);
+        buffer.remove(i4);
+
+        let plan = buffer.build_rectify_plan();
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0], (i2.offset, i5.offset));
+
+        //////////////////////////////////
+
+        buffer.clear();
+
+        let _i1 = buffer.push(TestElement { foo: 0 });
+        let i2 = buffer.push(TestElement { foo: 1 });
+        let i3 = buffer.push(TestElement { foo: 2 });
+        let i4 = buffer.push(TestElement { foo: 3 });
+        let i5 = buffer.push(TestElement { foo: 4 });
+
+        buffer.remove(i2);
+        buffer.remove(i3);
+
+        let plan = buffer.build_rectify_plan();
+        assert_eq!(plan.len(), 2);
+        assert_eq!(plan[0], (i2.offset, i5.offset));
+        assert_eq!(plan[1], (i3.offset, i4.offset));
     }
 }
