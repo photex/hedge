@@ -233,7 +233,7 @@ impl<D: Default> ElementBuffer<D> {
         self.generations[offset as usize] += 1;
     }
 
-    fn build_rectify_plan(&self) -> Vec<(u32, u32)> {
+    fn build_defrag_plan(&self) -> Vec<(u32, u32)> {
         let active_cells = (1..=self.buffer.len())
             .map(|idx| (self.buffer.len() - idx) as u32)
             .filter(|idx| !self.free_cells.contains(idx));
@@ -245,8 +245,25 @@ impl<D: Default> ElementBuffer<D> {
             .collect()
     }
 
-    pub fn compact(&mut self) {
-        let _rectify_map = self.build_rectify_plan();
+    pub fn defragment(&mut self) -> Vec<(u32, u32)> {
+        let plan = self.build_defrag_plan();
+        for (free, active) in &plan {
+            self.buffer.swap(*free as usize, *active as usize);
+            self.generations.swap(*free as usize, *active as usize);
+            self.free_cells.remove(free);
+            self.free_cells.insert(*active);
+        }
+        plan
+    }
+
+    pub fn compact(&mut self) -> Vec<(u32, u32)> {
+        let plan = self.defragment();
+
+        self.buffer.truncate(self.free_cells.len());
+        self.generations.truncate(self.free_cells.len());
+        self.free_cells.clear();
+
+        plan
     }
 }
 
@@ -505,7 +522,7 @@ mod tests {
     }
 
     #[test]
-    fn rectify_plan_basics() {
+    fn defrag_plan_basics() {
         let mut buffer = TestBuffer::default();
         let _i1 = buffer.push(TestElement { foo: 0 });
         let i2 = buffer.push(TestElement { foo: 1 });
@@ -517,17 +534,17 @@ mod tests {
         buffer.remove(i5);
 
         assert!(buffer.has_inactive_cells());
-        let plan = buffer.build_rectify_plan();
+        let plan = buffer.build_defrag_plan();
         assert_eq!(plan[0], (i2.offset, i4.offset));
         assert_eq!(plan.len(), 1);
 
         buffer.clear();
-        let plan = buffer.build_rectify_plan();
+        let plan = buffer.build_defrag_plan();
         assert!(plan.is_empty());
     }
 
     #[test]
-    fn rectify_plan_simple_expectations() {
+    fn defrag_plan_simple_expectations() {
         let mut buffer = TestBuffer::default();
         let i1 = buffer.push(TestElement { foo: 0 });
         let i2 = buffer.push(TestElement { foo: 1 });
@@ -543,7 +560,7 @@ mod tests {
         assert_eq!(buffer.len(), 1);
         assert_eq!(buffer.free_cells.len(), 4);
 
-        let plan = buffer.build_rectify_plan();
+        let plan = buffer.build_defrag_plan();
         assert_eq!(plan[0], (i1.offset, i5.offset));
         assert_eq!(plan.len(), 1);
 
@@ -562,7 +579,7 @@ mod tests {
         buffer.remove(i4);
         buffer.remove(i5);
 
-        let plan = buffer.build_rectify_plan();
+        let plan = buffer.build_defrag_plan();
         assert_eq!(plan[0], (i1.offset, i2.offset));
         assert_eq!(plan.len(), 1);
 
@@ -579,7 +596,7 @@ mod tests {
         buffer.remove(i2);
         buffer.remove(i4);
 
-        let plan = buffer.build_rectify_plan();
+        let plan = buffer.build_defrag_plan();
         assert_eq!(plan.len(), 1);
         assert_eq!(plan[0], (i2.offset, i5.offset));
 
@@ -596,14 +613,14 @@ mod tests {
         buffer.remove(i2);
         buffer.remove(i3);
 
-        let plan = buffer.build_rectify_plan();
+        let plan = buffer.build_defrag_plan();
         assert_eq!(plan.len(), 2);
         assert_eq!(plan[0], (i2.offset, i5.offset));
         assert_eq!(plan[1], (i3.offset, i4.offset));
     }
 
     #[test]
-    fn fuzz_rectify_plan() {
+    fn defragment() {
         use rand::{seq::SliceRandom, Rng};
 
         const ELEM_MAX: usize = 10_000;
@@ -632,12 +649,20 @@ mod tests {
 
         assert_eq!(buffer.len(), ELEM_MAX / 2);
 
-        let plan = buffer.build_rectify_plan();
+        let plan = buffer.defragment();
 
         let mut free_set = HashSet::new();
         let mut active_set = HashSet::new();
         assert!(plan.len() < ELEM_MAX / 2);
-        plan.iter()
-            .all(|(f, a)| f < a && free_set.insert(f) && active_set.insert(a));
+        assert!(plan
+            .iter()
+            .all(|(f, a)| f < a && free_set.insert(f) && active_set.insert(a)));
+
+        assert!(plan
+            .iter()
+            .all(|(f, a)| buffer.get_offset(*f).is_some() && buffer.get_offset(*a).is_none()));
+
+        let empty_plan = buffer.defragment();
+        assert!(empty_plan.is_empty());
     }
 }
