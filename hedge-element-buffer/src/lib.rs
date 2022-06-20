@@ -179,6 +179,13 @@ impl<D: Default> ElementBuffer<D> {
         self.buffer.get(handle.offset as usize)
     }
 
+    pub fn get_offset(&self, offset: Offset) -> Option<&D> {
+        if !self.is_active_cell(offset) {
+            return None;
+        }
+        self.buffer.get(offset as usize)
+    }
+
     pub fn get_mut(&mut self, handle: Handle<D>) -> Option<&mut D> {
         if !self.is_active_cell(handle.offset) {
             return None;
@@ -190,6 +197,13 @@ impl<D: Default> ElementBuffer<D> {
         }
 
         self.buffer.get_mut(handle.offset as usize)
+    }
+
+    pub fn get_offset_mut(&mut self, offset: Offset) -> Option<&mut D> {
+        if !self.is_active_cell(offset) {
+            return None;
+        }
+        self.buffer.get_mut(offset as usize)
     }
 
     /// .
@@ -214,6 +228,11 @@ impl<D: Default> ElementBuffer<D> {
         self.generations[handle.offset as usize] += 1;
     }
 
+    pub fn remove_offset(&mut self, offset: Offset) {
+        self.free_cells.insert(offset);
+        self.generations[offset as usize] += 1;
+    }
+
     fn build_rectify_plan(&self) -> Vec<(u32, u32)> {
         let active_cells = (1..=self.buffer.len())
             .map(|idx| (self.buffer.len() - idx) as u32)
@@ -231,18 +250,51 @@ impl<D: Default> ElementBuffer<D> {
     }
 }
 
+impl<D: Default> Index<usize> for ElementBuffer<D> {
+    type Output = D;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get_offset(index as Offset)
+            .expect("Unable to retrieve element at specified offset.")
+    }
+}
+
+impl<D: Default> Index<Offset> for ElementBuffer<D> {
+    type Output = D;
+
+    fn index(&self, index: Offset) -> &Self::Output {
+        self.get_offset(index)
+            .expect("Unable to retrieve element at specified offset.")
+    }
+}
+
 impl<D: Default> Index<Handle<D>> for ElementBuffer<D> {
     type Output = D;
 
     fn index(&self, handle: Handle<D>) -> &Self::Output {
         self.get(handle)
-            .expect("Unable to retrieve item for provided handle.")
+            .expect("Unable to retrieve element specified by the provided handle.")
     }
 }
 
 impl<D: Default> IndexMut<Handle<D>> for ElementBuffer<D> {
     fn index_mut(&mut self, handle: Handle<D>) -> &mut Self::Output {
-        self.get_mut(handle).expect("Unable to retrieve item.")
+        self.get_mut(handle)
+            .expect("Unable to retrieve element specified by the provided handle.")
+    }
+}
+
+impl<D: Default> IndexMut<Offset> for ElementBuffer<D> {
+    fn index_mut(&mut self, offset: Offset) -> &mut Self::Output {
+        self.get_offset_mut(offset)
+            .expect("Unable to retrieve element for provided offset.")
+    }
+}
+
+impl<D: Default> IndexMut<usize> for ElementBuffer<D> {
+    fn index_mut(&mut self, offset: usize) -> &mut Self::Output {
+        self.get_offset_mut(offset as Offset)
+            .expect("Unable to retrieve element for provided offset.")
     }
 }
 
@@ -548,5 +600,44 @@ mod tests {
         assert_eq!(plan.len(), 2);
         assert_eq!(plan[0], (i2.offset, i5.offset));
         assert_eq!(plan[1], (i3.offset, i4.offset));
+    }
+
+    #[test]
+    fn fuzz_rectify_plan() {
+        use rand::{seq::SliceRandom, Rng};
+
+        const ELEM_MAX: usize = 10_000;
+        let mut rng = rand::thread_rng();
+        let mut buffer = TestBuffer::with_capacity(ELEM_MAX);
+
+        for _i in 0..ELEM_MAX {
+            buffer.push(TestElement {
+                foo: rng.gen_range(1..ELEM_MAX) as u32,
+            });
+        }
+
+        let elements_to_remove = {
+            let mut offsets: Vec<Offset> = (0..(ELEM_MAX as Offset)).collect();
+            offsets.shuffle(&mut rand::thread_rng());
+            offsets.truncate(ELEM_MAX / 2);
+            offsets
+        };
+
+        assert_eq!(buffer.len(), ELEM_MAX);
+        assert!(!elements_to_remove.is_empty());
+
+        for idx in elements_to_remove {
+            buffer.remove_offset(idx);
+        }
+
+        assert_eq!(buffer.len(), ELEM_MAX / 2);
+
+        let plan = buffer.build_rectify_plan();
+
+        let mut free_set = HashSet::new();
+        let mut active_set = HashSet::new();
+        assert!(plan.len() < ELEM_MAX / 2);
+        plan.iter()
+            .all(|(f, a)| f < a && free_set.insert(f) && active_set.insert(a));
     }
 }
