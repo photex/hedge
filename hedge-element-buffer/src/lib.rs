@@ -214,20 +214,20 @@ impl<D: Default> ElementBuffer<D> {
         self.generations[handle.offset as usize] += 1;
     }
 
-    fn build_rectify_map(&self) -> Vec<(u32, u32)> {
-        let active_cell_offsets = (1..=self.buffer.len())
+    fn build_rectify_plan(&self) -> Vec<(u32, u32)> {
+        let active_cells = (1..=self.buffer.len())
             .map(|idx| (self.buffer.len() - idx) as u32)
             .filter(|idx| !self.free_cells.contains(idx));
         let free_cells =
-            (0..((self.buffer.len() / 2) as u32)).filter(|idx| self.free_cells.contains(idx));
+            (1..=(self.buffer.len() as u32)).filter(|idx| self.free_cells.contains(idx));
         free_cells
-            .zip(active_cell_offsets)
-            .map(|t| (t.0, t.1))
+            .zip(active_cells)
+            .take_while(|(f, a)| f < a)
             .collect()
     }
 
     pub fn compact(&mut self) {
-        let _rectify_map = self.build_rectify_map();
+        let _rectify_map = self.build_rectify_plan();
     }
 }
 
@@ -453,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn rectify_map_basics() {
+    fn rectify_plan_basics() {
         let mut buffer = TestBuffer::default();
         let _i1 = buffer.push(TestElement { foo: 0 });
         let i2 = buffer.push(TestElement { foo: 1 });
@@ -465,12 +465,34 @@ mod tests {
         buffer.remove(i5);
 
         assert!(buffer.has_inactive_cells());
-        let rectify_map = buffer.build_rectify_map();
-        assert_eq!(rectify_map.len(), 1);
-        assert_eq!(rectify_map[0], (i2.offset, i4.offset));
+        let plan = buffer.build_rectify_plan();
+        assert_eq!(plan[0], (i2.offset, i4.offset));
+        assert_eq!(plan.len(), 1);
 
         buffer.clear();
-        let rectify_map = buffer.build_rectify_map();
-        assert!(rectify_map.is_empty());
+        let plan = buffer.build_rectify_plan();
+        assert!(plan.is_empty());
+    }
+
+    #[test]
+    fn rectify_plan_expectations() {
+        let mut buffer = TestBuffer::default();
+        let i1 = buffer.push(TestElement { foo: 0 });
+        let i2 = buffer.push(TestElement { foo: 1 });
+        let i3 = buffer.push(TestElement { foo: 2 });
+        let i4 = buffer.push(TestElement { foo: 3 });
+        let i5 = buffer.push(TestElement { foo: 4 });
+
+        buffer.remove(i1);
+        buffer.remove(i2);
+        buffer.remove(i3);
+        buffer.remove(i4);
+
+        assert_eq!(buffer.len(), 1);
+        assert_eq!(buffer.free_cells.len(), 4);
+
+        let plan = buffer.build_rectify_plan();
+        assert_eq!(plan[0], (i1.offset, i5.offset));
+        assert_eq!(plan.len(), 1);
     }
 }
